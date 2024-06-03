@@ -57,16 +57,19 @@ class CSQLite
   {
 
 private:
+
    string            m_folder;
    string            m_filename;
    int               m_db_handle;
+   string            m_last_error;
+   bool              m_print;
 
 public:
-   void              CSQLite();
-   void             ~CSQLite();
+   void              CSQLite(bool print=true) {m_print=print;};
+   void             ~CSQLite() {};
 
    bool              OpenCreateDatabase(string folder, string filename);
-   void              CloseDatabase() {DatabaseClose(m_db_handle); Print("Database closed ("+m_filename+")");};
+   void              CloseDatabase() {DatabaseClose(m_db_handle); Print("=======>"+"Database closed ("+m_filename+")");};
 
    bool              TableExist(string table) {return(DatabaseTableExists(m_db_handle, table));};
    bool              TableInfo(string table);
@@ -83,41 +86,33 @@ public:
    bool              ModifyDataBy(string table_name, string column_name, string value, int id);
    bool              GetLastRow(string table_name);
    bool              GetLastRowData(string table_name, string &data[]);
+   string            LastError() {return(m_last_error);};
+   void              LastErrorReset() {m_last_error="";};
   };
 
-/**********************************************************************************************************************
-   the constructor
-**********************************************************************************************************************/
-void CSQLite::CSQLite()
-  {
-  }
 
-/**********************************************************************************************************************
-   the deconstructor
-**********************************************************************************************************************/
-void CSQLite::~CSQLite()
-  {
-  }
 
 /**********************************************************************************************************************
    open/create
 **********************************************************************************************************************/
 bool CSQLite::OpenCreateDatabase(string folder, string filename)
   {
-   
+
    //folder mean subfolder, everithig will be exported to the common folder+subfolder
    m_folder=folder;
    m_filename=filename;
+   m_last_error="";
 
    //open or create database
    m_db_handle=DatabaseOpen(folder+"\\"+filename+".sqlite", DATABASE_OPEN_READWRITE | DATABASE_OPEN_CREATE | DATABASE_OPEN_COMMON);
    if(m_db_handle < 0)
      {
-      Print("Failed to open database: ", GetLastError());
+      m_last_error="Failed to open database, error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
       return(false);
      }
 
-   Print("Opened database successfully ("+filename+")");
+   if(m_print) Print("=======>"+"Opened database successfully ("+filename+")");
 
    return(true);
   };
@@ -130,7 +125,8 @@ bool CSQLite::TableInfo(string table)
    //print table info
    if(DatabasePrint(m_db_handle, "PRAGMA TABLE_INFO("+table+")", 0)<0)
      {
-      Print("Unable to read table info, error: ",GetLastError());
+      m_last_error="Unable to read table info, error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
       return(false);
      }
 
@@ -145,7 +141,8 @@ bool CSQLite::CreateTable(string table, string &cols[], string &col_typs[])
    //array size need match
    if(ArraySize(cols) != ArraySize(col_typs))
      {
-      Print("Error: The number of column names and types do not match.");
+      m_last_error="Error: The number of column names and types do not match.";
+      if(m_print) Print("=======>"+m_last_error);
       return(false);
      }
 
@@ -163,11 +160,12 @@ bool CSQLite::CreateTable(string table, string &cols[], string &col_typs[])
    //execute command
    if(!DatabaseExecute(m_db_handle, req))
      {
-      Print("Table: "+ table+ " create table failed with code ", GetLastError());
+      m_last_error="Table: "+ table+ " create table failed with code, error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
       return(false);
      }
 
-   Print("Table created ("+table+")");
+   if(m_print) Print("=======>"+"Table created ("+table+")");
 
    return(true);
   }
@@ -182,7 +180,8 @@ bool CSQLite::DropTable(string table)
      {
       if(!DatabaseExecute(m_db_handle, "DROP TABLE "+table))
         {
-         Print("Failed to drop table "+table+" with code ", GetLastError());
+         m_last_error="Failed to drop table "+table+" with code, error: "+DoubleToString(GetLastError(),0);
+         if(m_print) Print("=======>"+m_last_error);
          return(false);
         }
      }
@@ -213,7 +212,8 @@ void CSQLite::PrintTable(string table_name)
    if(DatabasePrint(m_db_handle, "SELECT * FROM "+table_name+";", 0)) ;
    else
      {
-      Print("Failed to print table. Error: ",GetLastError());
+      m_last_error="Failed to print table. error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
   }
 
@@ -224,16 +224,17 @@ bool CSQLite::InsertColumn(string table_name, string column_name, string column_
   {
    //sql command
    string sqlCommand = "ALTER TABLE "+table_name+" ADD COLUMN " +column_name+" "+ column_type+";";
-
+ 
    //execute command
    if(DatabaseExecute(m_db_handle, sqlCommand))
      {
-      Print("Column added successfully.");
+      if(m_print) Print("=======>"+"Column added successfully.");
       return(true);
      }
    else
      {
-      Print("Failed to add the column. Error: ",GetLastError());
+      m_last_error="Failed to add the column. error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
 
    return(false);
@@ -250,12 +251,13 @@ bool CSQLite::RemoveColumn(string table_name, string column_name)
    //execute command
    if(DatabaseExecute(m_db_handle, sqlCommand))
      {
-      Print("Column added successfully.");
+      if(m_print) Print("=======>"+"Column added successfully.");
       return(true);
      }
    else
      {
-      Print("Failed to remove the column. Error: ",GetLastError());
+      m_last_error="Failed to remove the column. error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
 
    return(false);
@@ -276,7 +278,8 @@ bool CSQLite::InsertData(string table_name, string cols, string values)
    //execute command
    if(!DatabaseExecute(m_db_handle, sqlCommand))
      {
-      PrintFormat("%s: failed to insert data.");
+      m_last_error="Failed to insert data, error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
       failed=true;
      }
 
@@ -285,7 +288,6 @@ bool CSQLite::InsertData(string table_name, string cols, string values)
      {
       //--- roll back all transactions and unlock the database
       DatabaseTransactionRollback(m_db_handle);
-      PrintFormat("%s: DatabaseExecute() failed with code %d", __FUNCTION__, GetLastError());
       return(false);
      }
      
@@ -307,12 +309,13 @@ bool CSQLite::RemoveRowByID(string table_name, int id)
    //execute command
    if(DatabaseExecute(m_db_handle, sqlCommand))
      {
-      Print("Row added successfully.");
+      if(m_print) Print("=======>"+"Row added successfully.");
       return(true);
      }
    else
      {
-      Print("Failed to remove row. Error: ",GetLastError());
+      m_last_error="Failed to remove row. error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
 
    return(false);
@@ -330,12 +333,13 @@ bool CSQLite::ModifyDataBy(string table_name, string column_name, string value, 
    //execute command
    if(DatabaseExecute(m_db_handle, sqlCommand))
      {
-      Print("Data updated successfully.");
+      if(m_print) Print("=======>"+"Data updated successfully.");
       return(true);
      }
    else
      {
-      Print("Failed to modify data. Error: ",GetLastError());
+      m_last_error="Failed to modify data. error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
 
    return(false);
@@ -353,12 +357,12 @@ bool CSQLite::GetLastRow(string table_name)
    //execute command
    if(DatabasePrint(m_db_handle, sqlCommand, 0))
      {
-      ;
       return(true);
      }
    else
      {
-      Print("Failed to add the column.");
+      m_last_error="Failed to add the column."+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
      }
 
    return(false);
@@ -377,7 +381,8 @@ bool CSQLite::GetLastRowData(string table_name, string &data[])
    int request=DatabasePrepare(m_db_handle, sqlCommand);
    if(request==INVALID_HANDLE)
      {
-      Print("Create request failed with code ", GetLastError());
+      m_last_error="Create request failed with code, error: "+DoubleToString(GetLastError(),0);
+      if(m_print) Print("=======>"+m_last_error);
       DatabaseClose(m_db_handle);
       return(false);
      }
@@ -394,7 +399,8 @@ bool CSQLite::GetLastRowData(string table_name, string &data[])
             int val;
             if(!DatabaseColumnInteger(request, i, val))  // Assuming you want the data from the first column (index 0)
               {
-               Print("Read data from request failed with code ", GetLastError());
+               m_last_error="Read data from request failed with code, error: "+DoubleToString(GetLastError(),0);
+               if(m_print) Print("=======>"+m_last_error);
                DatabaseClose(m_db_handle);
                return(false);
               }
@@ -405,7 +411,8 @@ bool CSQLite::GetLastRowData(string table_name, string &data[])
             double val;
             if(!DatabaseColumnDouble(request, i, val))  // Assuming you want the data from the first column (index 0)
               {
-               Print("Read data from request failed with code ", GetLastError());
+               m_last_error="Read data from request failed with, error: "+DoubleToString(GetLastError(),0);
+               if(m_print) Print("=======>"+m_last_error);
                DatabaseClose(m_db_handle);
                return(false);
               }
@@ -417,7 +424,8 @@ bool CSQLite::GetLastRowData(string table_name, string &data[])
             string val;
             if(!DatabaseColumnText(request, i, val))  // Assuming you want the data from the first column (index 0)
               {
-               Print("Read data from request failed with code ", GetLastError());
+               m_last_error="Read data from request failed with code, error: "+DoubleToString(GetLastError(),0);
+               if(m_print) Print("=======>"+m_last_error);
                DatabaseClose(m_db_handle);
                return(false);
               }
